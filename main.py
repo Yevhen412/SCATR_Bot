@@ -3,7 +3,7 @@ import json
 import websocket
 import threading
 import time
-from config import TRADE_AMOUNT_USD, SYMBOL, MAKER_FEE, TAKER_FEE
+from config import TRADE_AMOUNT_USD, SYMBOL, COMMISSION
 from telegram_utils import send_telegram_message
 
 position = None
