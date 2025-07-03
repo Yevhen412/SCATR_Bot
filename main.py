@@ -5,6 +5,10 @@ import json
 from websocket import WebSocketApp
 from telegram_utils import send_telegram_message
 from config import TRADE_AMOUNT_USD, SYMBOL, COMMISSION
+
+position = None
+entry_price = 0
+
 def on_open(ws):
     print("🔌 WebSocket соединение открыто")
     subscribe_message = {
@@ -15,28 +19,43 @@ def on_open(ws):
     send_telegram_message("🤖 Бот подключён к стакану и запущен.")
 
 def on_message(ws, message):
+    global position, entry_price
     try:
-        print(f"[WebSocket] Получено сообщение: {message}")
         data = json.loads(message)
         if "data" in data:
             orderbook = data["data"]
             best_bid = float(orderbook["b"][0][0])
             best_ask = float(orderbook["a"][0][0])
             spread = best_ask - best_bid
-            profit = spread
-            net_profit = profit - (best_bid * TAKER_FEE / 100) - (best_ask * MAKER_FEE / 100)
 
-            print(f"🔍 BID: {best_bid}, ASK: {best_ask}, PROFIT: {profit:.2f}, NET: {net_profit:.2f}")
+            print(f"🔍 BID: {best_bid}, ASK: {best_ask}, SPREAD: {spread:.4f}")
 
-            if net_profit > 0:
-                send_telegram_message(f"🟢 BUY @ {best_bid}")
+            # Открытие позиции
+            if position is None and spread > 0.2:
+                entry_price = best_ask
+                position = "long"
+                send_telegram_message(f"🟢 BUY @ {entry_price:.2f}")
+
+            # Закрытие позиции
+            elif position == "long":
+                exit_price = best_bid
+                gross_profit = (exit_price - entry_price) * (TRADE_AMOUNT_USD / entry_price)
+                commission_cost = TRADE_AMOUNT_USD * (COMMISSION / 100)
+                net_profit = gross_profit - commission_cost
+
+                print(f"💡 Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
+
+                if net_profit >= 0.1:
+                    send_telegram_message(f"🔴 SELL @ {exit_price:.2f}\n💰 Net PnL: {net_profit:.2f} USDT")
+                    position = None
+
     except Exception as e:
         print(f"❌ Ошибка обработки данных: {e}")
         send_telegram_message(f"❌ Ошибка обработки данных: {e}")
 
 def heartbeat():
     while True:
-        time.sleep(600)
+        time.sleep(600)  # 10 минут
         print("✅ Heartbeat: бот активен")
         send_telegram_message("✅ Бот активен")
 
