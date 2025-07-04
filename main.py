@@ -54,6 +54,14 @@ def summary():
                     msg += f"{t}: BUY @ {p:.2f}\n"
                 send_telegram_message(msg)
         trades.clear()
+def on_open(ws):
+    print("🔌 Соединение открыто")
+
+def on_close(ws):
+    print("🔌 Соединение закрыто")
+
+def on_error(ws, error):
+    print(f"❌ Ошибка: {error}")
 
 def run_bot():
     print("⚙️ run_bot() запускается")
