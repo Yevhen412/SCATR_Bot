@@ -10,38 +10,40 @@ entry_prices = {}
 trades = {}
 
 def on_message(ws, message):
-     print("📥 Получено сообщение от WebSocket")
-try:
+    print("📥 Получено сообщение от WebSocket")  # 👈 это отладка
+
+    try:
         data = json.loads(message)
         if "data" in data and isinstance(data["data"], list):
             update = data["data"][0]
-            symbol = update.get("s")
             bid = float(update["b"])
             ask = float(update["a"])
             spread = ask - bid
             gross_profit = spread
             net_profit = gross_profit - COMMISSION
 
-            print(f"[{symbol}] BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}, Net: {net_profit:.4f}")
+            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
+            print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
 
-            entry_price = entry_prices.get(symbol)
-
-            if entry_price and bid < entry_price * 0.985:
-                send_telegram_message(f"🔻 [{symbol}] Цена упала > 1.5% — сделка отменена.")
+            # Защита от падения
+            if entry_price and (bid < entry_price * 0.985):
+                send_telegram_message("🔻 Цена упала более чем на 1.5% — сделка не будет открыта.")
                 return
 
-            if entry_price and bid < entry_price * 0.993:
-                send_telegram_message(f"🛑 [{symbol}] Стоп-лосс: BID = {bid}")
-                entry_prices[symbol] = None
+            # Стоп-лосс
+            if entry_price and (bid < entry_price * 0.993):
+                send_telegram_message(f"🛑 Стоп-лосс: BID = {bid}")
+                entry_price = None
                 return
 
             if net_profit > 0.01:
-                entry_prices[symbol] = ask
+                entry_price = ask
                 trade_time = time.strftime('%H:%M:%S')
-                trades.setdefault(symbol, []).append((trade_time, ask))
-                send_telegram_message(f"🟢 [{symbol}] BUY @ {ask:.2f}")
+                trades.append((trade_time, ask))
+                send_telegram_message(f"🟢 BUY @ {ask:.2f}")
+
     except Exception as e:
-        send_telegram_message(f"❌ Ошибка обработки [{symbol}]: {e}")
+        send_telegram_message(f"❌ Ошибка обработки данных: {e}")
 
 def on_open(ws):
     print("🧩 Внутри on_open")
