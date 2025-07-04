@@ -15,19 +15,21 @@ def on_message(ws, message):
     try:
         data = json.loads(message)
 
-        # Проверка на наличие ключа "data" и нужных данных внутри
-        if "data" in data and "b" in data["data"] and "a" in data["data"]:
-            bid = float(data["data"]["b"][0][0])
-            ask = float(data["data"]["a"][0][0])
-            spread = ask - bid
-            gross_profit = spread
-            net_profit = gross_profit - COMMISSION
+        if "data" in data and isinstance(data["data"], dict):
+            update = data["data"]
+            if "b" in update and "a" in update and update["b"] and update["a"]:
+                bid = float(update["b"][0][0])
+                ask = float(update["a"][0][0])
+                spread = ask - bid
+                gross_profit = spread
+                net_profit = gross_profit - COMMISSION
 
-            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
-            print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
-
+                print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
+                print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
+            else:
+                print("🔸 Пропущено сообщение без bid/ask")
         else:
-            raise ValueError("Неверный формат данных")
+            print("🔸 Пропущено сообщение без data")
 
     except Exception as e:
         print(f"❌ Ошибка обработки данных: {e}")
