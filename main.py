@@ -37,6 +37,7 @@ def on_message(ws, message):
     except Exception as e:
         print(f"Ошибка обработки данных: {e}")
         send_telegram_message(f"❌ Ошибка обработки данных: {e}")
+
 def heartbeat():
     while True:
         time.sleep(600)
@@ -54,6 +55,7 @@ def summary():
                     msg += f"{t}: BUY @ {p:.2f}\n"
                 send_telegram_message(msg)
         trades.clear()
+
 def on_open(ws):
     print("🔌 Соединение открыто")
 
@@ -61,7 +63,8 @@ def on_close(ws):
     print("🔌 Соединение закрыто")
 
 def on_error(ws, error):
-    print(f"❌ Ошибка: {error}")
+    print(f"❌ Ошибка WebSocket: {error}")
+    send_telegram_message(f"❌ Ошибка WebSocket: {error}")
 
 def run_bot():
     print("⚙️ run_bot() запускается")
@@ -74,7 +77,9 @@ def run_bot():
             ws = websocket.WebSocketApp(
                 "wss://stream.bybit.com/v5/public/spot",
                 on_open=on_open,
-                on_message=on_message
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close
             )
             print("🟢 WebSocket создан, запускаем run_forever()")
             ws.run_forever()
