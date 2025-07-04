@@ -15,21 +15,25 @@ def on_message(ws, message):
     try:
         data = json.loads(message)
 
-        if "data" in data and isinstance(data["data"], dict):
-            update = data["data"]
-            if "b" in update and "a" in update and update["b"] and update["a"]:
-                bid = float(update["b"][0][0])
-                ask = float(update["a"][0][0])
-                spread = ask - bid
-                gross_profit = spread
-                net_profit = gross_profit - COMMISSION
+        if not isinstance(data, dict) or "data" not in data:
+            return
 
-                print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
-                print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
-            else:
-                print("🔸 Пропущено сообщение без bid/ask")
+        update = data["data"]
+
+        if not isinstance(update, dict):
+            return
+
+        if "b" in update and "a" in update and update["b"] and update["a"]:
+            bid = float(update["b"][0][0])
+            ask = float(update["a"][0][0])
+            spread = ask - bid
+            gross_profit = spread
+            net_profit = gross_profit - COMMISSION
+
+            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
+            print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
         else:
-            print("🔸 Пропущено сообщение без data")
+            print("🔸 Пропущено сообщение без bid/ask")
 
     except Exception as e:
         print(f"❌ Ошибка обработки данных: {e}")
