@@ -11,7 +11,7 @@ trades = {}
 
 def on_message(ws, message):
      print("📥 Получено сообщение от WebSocket")
-    try:
+try:
         data = json.loads(message)
         if "data" in data and isinstance(data["data"], list):
             update = data["data"][0]
