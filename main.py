@@ -1,4 +1,3 @@
-
 import time
 import threading
 import json
@@ -11,6 +10,7 @@ entry_prices = {}
 trades = {}
 
 def on_message(ws, message):
+     print("📥 Получено сообщение от WebSocket")
     try:
         data = json.loads(message)
         if "data" in data and isinstance(data["data"], list):
