@@ -10,41 +10,33 @@ entry_prices = {}
 trades = {}
 
 def on_message(ws, message):
-    print("👀 Вошёл в on_message")
-    print("🔹 Сообщение:", message)
+    print("📥 Вошёл в on_message")
 
-    data = json.loads(message)
+    try:
+        data = json.loads(message)
 
-   try:
-    update = data["data"][0]
+        if "data" in data and isinstance(data["data"], list):
+            update = data["data"][0]
 
-    if "b" in update and "a" in update and len(update["b"]) > 0 and len(update["a"]) > 0:
-        bid = float(update["b"][0][0])
-        ask = float(update["a"][0][0])
-    else:
-        raise ValueError("Нет данных bid/ask")
+            if "b" in update and "a" in update and len(update["b"]) > 0 and len(update["a"]) > 0:
+                bid = float(update["b"][0][0])
+                ask = float(update["a"][0][0])
+            else:
+                raise ValueError("Нет данных bid/ask")
 
-    spread = ask - bid
-    gross_profit = spread
-    net_profit = gross_profit - COMMISSION
+            spread = ask - bid
+            gross_profit = spread
+            net_profit = gross_profit - COMMISSION
 
-    print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
-    print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
+            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
+            print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
 
-except Exception as e:
-    print(f"Ошибка обработки данных: {e}")
-    send_telegram_message(f"❌ Ошибка обработки данных: {e}")
+        else:
+            raise ValueError("Неверный формат данных")
 
-   def on_open(ws):
-    print("🧩 Внутри on_open")
-    args = [f"orderbook.1.{symbol}" for symbol in SYMBOLS]
-    ws.send(json.dumps({
-        "op": "subscribe",
-        "args": args
-    }))
-    for symbol in SYMBOLS:
-        send_telegram_message(f"🤖 [{symbol}] Бот подключён к стакану и запущен.")
-
+    except Exception as e:
+        print(f"Ошибка обработки данных: {e}")
+        send_telegram_message(f"❌ Ошибка обработки данных: {e}")
 def heartbeat():
     while True:
         time.sleep(600)
