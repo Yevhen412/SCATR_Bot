@@ -58,6 +58,18 @@ def summary():
 
 def on_open(ws):
     print("🔌 Соединение открыто")
+    try:
+        args = [f"orderbook.1.{symbol}" for symbol in SYMBOLS]
+        subscribe_message = {
+            "op": "subscribe",
+            "args": args
+        }
+        ws.send(json.dumps(subscribe_message))
+        print(f"📡 Подписка отправлена: {args}")
+        send_telegram_message(f"✅ Соединение открыто. Подписка отправлена: {args}")
+    except Exception as e:
+        print(f"❌ Ошибка при подписке: {e}")
+        send_telegram_message(f"❌ Ошибка при подписке: {e}")
 
 def on_close(ws, close_status_code, close_msg):
     print("🔌 Соединение закрыто")
