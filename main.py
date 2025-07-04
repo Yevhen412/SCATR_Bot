@@ -62,7 +62,7 @@ def summary():
     while True:
         time.sleep(3600)
         if trades:
-            msg = "📊 Сводка по сделкам за час:
+            msg = "📊 Сводка по сделкам за час:"
 "
             for t, p in trades:
                 msg += f"{t}: BUY @ {p:.2f}
