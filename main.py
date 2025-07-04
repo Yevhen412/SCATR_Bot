@@ -48,73 +48,7 @@ def on_message(ws, message):
     except Exception as e:
         send_telegram_message(f"❌ Ошибка обработки данных: {e}")
 
-    try:
-        data = json.loads(message)
-        if "data" in data and isinstance(data["data"], list):
-            update = data["data"][0]
-            bid = float(update["b"])
-            ask = float(update["a"])
-            spread = ask - bid
-            gross_profit = spread
-            net_profit = gross_profit - COMMISSION
-
-            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
-            print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
-
-            # Защита от падения
-            if entry_price and (bid < entry_price * 0.985):
-                send_telegram_message("🔻 Цена упала более чем на 1.5% — сделка не будет открыта.")
-                return
-
-            # Стоп-лосс
-            if entry_price and (bid < entry_price * 0.993):
-                send_telegram_message(f"🛑 Стоп-лосс: BID = {bid}")
-                entry_price = None
-                return
-
-            if net_profit > 0.01:
-                entry_price = ask
-                trade_time = time.strftime('%H:%M:%S')
-                trades.append((trade_time, ask))
-                send_telegram_message(f"🟢 BUY @ {ask:.2f}")
-
-    except Exception as e:
-        send_telegram_message(f"❌ Ошибка обработки данных: {e}")
-
-    try:
-        data = json.loads(message)
-        if "data" in data and isinstance(data["data"], list):
-            update = data["data"][0]
-            bid = float(update["b"])
-            ask = float(update["a"])
-            spread = ask - bid
-            gross_profit = spread
-            net_profit = gross_profit - COMMISSION
-
-            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
-            print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
-
-            # Защита от падения
-            if entry_price and (bid < entry_price * 0.985):
-                send_telegram_message("🔻 Цена упала более чем на 1.5% — сделка не будет открыта.")
-                return
-
-            # Стоп-лосс
-            if entry_price and (bid < entry_price * 0.993):
-                send_telegram_message(f"🛑 Стоп-лосс: BID = {bid}")
-                entry_price = None
-                return
-
-            if net_profit > 0.01:
-                entry_price = ask
-                trade_time = time.strftime('%H:%M:%S')
-                trades.append((trade_time, ask))
-                send_telegram_message(f"🟢 BUY @ {ask:.2f}")
-
-    except Exception as e:
-        send_telegram_message(f"❌ Ошибка обработки данных: {e}")
-
-def on_open(ws):
+   def on_open(ws):
     print("🧩 Внутри on_open")
     args = [f"orderbook.1.{symbol}" for symbol in SYMBOLS]
     ws.send(json.dumps({
