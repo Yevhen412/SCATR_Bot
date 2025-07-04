@@ -15,15 +15,10 @@ def on_message(ws, message):
     try:
         data = json.loads(message)
 
-        if "data" in data and isinstance(data["data"], list):
-            update = data["data"][0]
-
-            if "b" in update and "a" in update and len(update["b"]) > 0 and len(update["a"]) > 0:
-                bid = float(update["b"][0][0])
-                ask = float(update["a"][0][0])
-            else:
-                raise ValueError("Нет данных bid/ask")
-
+        # Проверка на наличие ключа "data" и нужных данных внутри
+        if "data" in data and "b" in data["data"] and "a" in data["data"]:
+            bid = float(data["data"]["b"][0][0])
+            ask = float(data["data"]["a"][0][0])
             spread = ask - bid
             gross_profit = spread
             net_profit = gross_profit - COMMISSION
@@ -35,7 +30,7 @@ def on_message(ws, message):
             raise ValueError("Неверный формат данных")
 
     except Exception as e:
-        print(f"Ошибка обработки данных: {e}")
+        print(f"❌ Ошибка обработки данных: {e}")
         send_telegram_message(f"❌ Ошибка обработки данных: {e}")
 
 def heartbeat():
