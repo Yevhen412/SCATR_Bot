@@ -19,8 +19,8 @@ def on_message(ws, message):
         data = json.loads(message)
         if "data" in data and isinstance(data["data"], list):
             update = data["data"][0]
-            bid = float(update["b"])
-            ask = float(update["a"])
+            bid = float(update["b"][0][0])
+            ask = float(update["a"][0][0])
             spread = ask - bid
             gross_profit = spread
             net_profit = gross_profit - COMMISSION
