@@ -63,10 +63,10 @@ def summary():
         time.sleep(3600)
         if trades:
             msg = "📊 Сводка по сделкам за час:"
-"
+
             for t, p in trades:
-                msg += f"{t}: BUY @ {p:.2f}
-"
+                msg += f"{t}: BUY @ {p:.2f}"
+
             send_telegram_message(msg)
             trades.clear()
 
