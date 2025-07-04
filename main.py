@@ -59,8 +59,9 @@ def summary():
 def on_open(ws):
     print("🔌 Соединение открыто")
 
-def on_close(ws):
+def on_close(ws, close_status_code, close_msg):
     print("🔌 Соединение закрыто")
+    send_telegram_message("🔌 Соединение с WebSocket закрыто")
 
 def on_error(ws, error):
     print(f"❌ Ошибка WebSocket: {error}")
