@@ -1,57 +1,63 @@
 
 import time
 import threading
-from config import SYMBOL, TRADE_AMOUNT_USD, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, COMMISSION
-from telegram_utils import send_telegram_message
-import websocket
 import json
+import websocket
 
-last_price = None
-entry_price = None
-trade_time = None
-trades = []
+from config import SYMBOLS, TRADE_AMOUNT_USD, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, COMMISSION
+from telegram_utils import send_telegram_message
 
-def on_message(ws, message):
-    global last_price, entry_price, trade_time, trades
+trades = {}
+entry_prices = {}
 
-    try:
-        data = json.loads(message)
-        if "data" in data and isinstance(data["data"], list):
-            update = data["data"][0]
-            bid = float(update["b"])
-            ask = float(update["a"])
-            spread = ask - bid
-            gross_profit = spread
-            net_profit = gross_profit - COMMISSION
+def on_message(symbol):
+    def inner(ws, message):
+        global trades, entry_prices
 
-            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
-            print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
+        try:
+            data = json.loads(message)
+            if "data" in data and isinstance(data["data"], list):
+                update = data["data"][0]
+                bid = float(update["b"])
+                ask = float(update["a"])
+                spread = ask - bid
+                gross_profit = spread
+                net_profit = gross_profit - COMMISSION
 
-            # Защита от падения
-            if entry_price and (bid < entry_price * 0.985):
-                send_telegram_message("🔻 Цена упала более чем на 1.5% — сделка не будет открыта.")
-                return
+                print(f"[{symbol}] BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
+                print(f"[{symbol}] Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
 
-            # Выход по стоп-лоссу
-            if entry_price and (bid < entry_price * 0.993):
-                send_telegram_message(f"🛑 Стоп-лосс: BID = {bid}")
-                entry_price = None
-                return
+                entry_price = entry_prices.get(symbol)
 
-            if net_profit > 0.01:
-                entry_price = ask
-                trade_time = time.strftime('%H:%M:%S')
-                trades.append((trade_time, ask))
-                send_telegram_message(f"🟢 BUY @ {ask:.2f}")
-    except Exception as e:
-        send_telegram_message(f"❌ Ошибка обработки данных: {e}")
+                # Фильтр резкого падения
+                if entry_price and bid < entry_price * 0.985:
+                    send_telegram_message(f"🔻 [{symbol}] Цена упала > 1.5% — сделка не открыта.")
+                    return
 
-def on_open(ws):
-    ws.send(json.dumps({
-        "op": "subscribe",
-        "args": [f"orderbook.1.{SYMBOL}"]
-    }))
-    send_telegram_message("🤖 Бот подключён к стакану и запущен.")
+                # Стоп-лосс
+                if entry_price and bid < entry_price * 0.993:
+                    send_telegram_message(f"🛑 [{symbol}] Стоп-лосс: BID = {bid:.2f}")
+                    entry_prices[symbol] = None
+                    return
+
+                # Сделка
+                if net_profit > 0.01:
+                    entry_prices[symbol] = ask
+                    trade_time = time.strftime('%H:%M:%S')
+                    trades.setdefault(symbol, []).append((trade_time, ask))
+                    send_telegram_message(f"🟢 [{symbol}] BUY @ {ask:.2f}")
+        except Exception as e:
+            send_telegram_message(f"❌ [{symbol}] Ошибка: {e}")
+    return inner
+
+def on_open(symbol):
+    def inner(ws):
+        ws.send(json.dumps({
+            "op": "subscribe",
+            "args": [f"orderbook.1.{symbol}"]
+        }))
+        send_telegram_message(f"🤖 [{symbol}] Бот подключён к стакану и запущен.")
+    return inner
 
 def heartbeat():
     while True:
@@ -61,30 +67,28 @@ def heartbeat():
 def summary():
     while True:
         time.sleep(3600)
-        if trades:
-            msg = "📊 Сводка по сделкам за час:"
-
-            for t, p in trades:
-                msg += f"{t}: BUY @ {p:.2f}"
-
-            send_telegram_message(msg)
-            trades.clear()
+        for symbol, symbol_trades in trades.items():
+            if symbol_trades:
+                msg = f"📊 [{symbol}] Сводка за час:\n"
+                for t, p in symbol_trades:
+                    msg += f"{t}: BUY @ {p:.2f}\n"
+                send_telegram_message(msg)
+                trades[symbol] = []
 
 def run_bot():
     threading.Thread(target=heartbeat, daemon=True).start()
     threading.Thread(target=summary, daemon=True).start()
 
+    for symbol in SYMBOLS:
+        ws = websocket.WebSocketApp(
+            "wss://stream.bybit.com/v5/public/spot",
+            on_open=on_open(symbol),
+            on_message=on_message(symbol)
+        )
+        threading.Thread(target=ws.run_forever, daemon=True).start()
+
     while True:
-        try:
-            ws = websocket.WebSocketApp(
-                "wss://stream.bybit.com/v5/public/spot",
-                on_open=on_open,
-                on_message=on_message
-            )
-            ws.run_forever()
-        except Exception as e:
-            send_telegram_message(f"❌ Ошибка подключения: {e}")
-            time.sleep(10)
+        time.sleep(1)
 
 if __name__ == "__main__":
     run_bot()
