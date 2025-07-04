@@ -17,7 +17,7 @@ def on_message(ws, message):
 
     try:
         data = json.loads(message)
-        if "data" in data and isinstance(data["data"], list):
+        if "data" in data and isinstance(data["data"], dict):
             update = data["data"][0]
             bid = float(update["b"][0][0])
             ask = float(update["a"][0][0])
