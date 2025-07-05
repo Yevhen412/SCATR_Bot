@@ -6,6 +6,7 @@ from collections import deque
 
 from config import SYMBOLS, TRADE_AMOUNT_USD, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, COMMISSION
 from telegram_utils import send_telegram_message
+from volatility_analyzer import update_volatility, start_volatility_analysis
 
 entry_prices = {}
 trades = {}
@@ -27,7 +28,7 @@ def on_message(ws, message):
         gross_profit = spread * TRADE_AMOUNT_USD / ask
         net_profit = gross_profit - (COMMISSION * 2 * TRADE_AMOUNT_USD)
 
-        # Фильтр от "ловли ножей": если цена изменилась > 1% за 5 тиков
+        # ⚠️ Фильтр от "ловли ножей": если цена изменилась > 1% за 5 тиков
         price_history[symbol].append((bid + ask) / 2)
         if len(price_history[symbol]) == 5:
             old_price = price_history[symbol][0]
@@ -37,7 +38,11 @@ def on_message(ws, message):
                 print(f"⚠️ Резкое движение по {symbol}, фильтр активирован: Δ={delta:.4f}")
                 return
 
-        # Вход только при чистой прибыли > 0.005 USDT
+        # 📈 Обновление волатильности
+        mid_price = (bid + ask) / 2
+        update_volatility(symbol, mid_price)
+
+        # ✅ Вход только при чистой прибыли > 0.005 USDT
         if net_profit > 0.005:
             entry_price = ask
             exit_price = bid
@@ -78,6 +83,7 @@ def summary():
 def run_bot():
     threading.Thread(target=heartbeat, daemon=True).start()
     threading.Thread(target=summary, daemon=True).start()
+    start_volatility_analysis()
 
     while True:
         try:
