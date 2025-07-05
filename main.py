@@ -48,7 +48,6 @@ def update_statistics(symbol, profit):
     statistics[symbol]["total_profit"] += profit
 
 entry_prices = {}
-trades = {}
 
 def on_message(ws, message):
     print("📥 Вошёл в on_message")
