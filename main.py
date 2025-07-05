@@ -27,18 +27,18 @@ def on_message(ws, message):
         gross_profit = spread * TRADE_AMOUNT_USD / ask
         net_profit = gross_profit - (COMMISSION * 2 * TRADE_AMOUNT_USD)
 
-        # Фильтр от "ловли ножей": если цена резко изменилась > 0.3% за 5 тиков
+        # Фильтр от "ловли ножей": если цена изменилась > 1% за 5 тиков
         price_history[symbol].append((bid + ask) / 2)
         if len(price_history[symbol]) == 5:
             old_price = price_history[symbol][0]
             new_price = price_history[symbol][-1]
             delta = abs(new_price - old_price) / old_price
-            if delta > 0.003:
+            if delta > 0.01:
                 print(f"⚠️ Резкое движение по {symbol}, фильтр активирован: Δ={delta:.4f}")
                 return
 
-        # Вход только при чистой прибыли > 0.03 USDT
-        if net_profit > 0.03:
+        # Вход только при чистой прибыли > 0.005 USDT
+        if net_profit > 0.005:
             entry_price = ask
             exit_price = bid
             profit = net_profit
@@ -54,18 +54,15 @@ def on_message(ws, message):
     except Exception as e:
         send_telegram_message(f"❌ Ошибка обработки данных: {e}")
 
-
 def on_open(ws):
     args = [f"orderbook.1.{symbol}" for symbol in SYMBOLS]
     ws.send(json.dumps({"op": "subscribe", "args": args}))
     send_telegram_message("🤖 Бот подключён к стакану и запущен.")
 
-
 def heartbeat():
     while True:
         time.sleep(600)
         send_telegram_message("✅ Бот активен")
-
 
 def summary():
     while True:
@@ -77,7 +74,6 @@ def summary():
                     msg += f"{t}: PnL = {p:.4f} USDT\n"
                 send_telegram_message(msg)
         trades.clear()
-
 
 def run_bot():
     threading.Thread(target=heartbeat, daemon=True).start()
@@ -94,7 +90,6 @@ def run_bot():
         except Exception as e:
             send_telegram_message(f"❌ Ошибка подключения: {e}")
             time.sleep(10)
-
 
 if __name__ == "__main__":
     run_bot()
