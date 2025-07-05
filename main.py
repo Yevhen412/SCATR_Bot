@@ -11,7 +11,7 @@ trades = []
 statistics = {}
 
 def enter_trade(symbol, price, now):
-    trades = {}
+    trades = []
     trade = {
         "symbol": symbol,
         "entry_price": price,
