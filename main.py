@@ -11,23 +11,15 @@ trades = []
 statistics = {}
 
 def enter_trade(symbol, price, now):
-    trades = []
     trade = {
         "symbol": symbol,
         "entry_price": price,
         "entry_time": now,
         "status": "open"
     }
-
-    if symbol not in trades:
-        trades[symbol] = []  # создаём список для нового символа
-
-    trades[symbol].append(trade)
-
-    send_telegram_message(
-        f"📥 Вход в сделку по {symbol}\nЦена входа: {price}\nВремя: {now}"
-    )
-
+    trades.append(trade)
+    send_telegram_message(f"✅ Вход в сделку по {symbol}\nЦена входа: {price}\nВремя: {now}")
+    
 def exit_trade(symbol, price, now):
     if symbol not in trades:
         return  # нет активных сделок для символа
