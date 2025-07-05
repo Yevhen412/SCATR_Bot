@@ -7,6 +7,43 @@ from config import SYMBOLS, TRADE_AMOUNT_USD, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, 
 from telegram_utils import send_telegram_message
 
 entry_prices = {}
+trades = []
+statistics = {}
+
+def enter_trade(symbol, price, now):
+    trade = {
+        "symbol": symbol,
+        "entry_price": price,
+        "entry_time": now,
+        "status": "open"
+    }
+    trades.append(trade)
+    send_telegram_message(f"📈 Вход в сделку по {symbol}\nЦена входа: {price}\nВремя: {now}")
+
+def exit_trade(symbol, price, now):
+    for trade in trades:
+        if trade["symbol"] == symbol and trade["status"] == "open":
+            trade["exit_price"] = price
+            trade["exit_time"] = now
+            trade["profit"] = round(price - trade["entry_price"], 6)
+            trade["status"] = "closed"
+
+            update_statistics(symbol, trade["profit"])
+            send_telegram_message(
+                f"🚪 Выход из сделки по {symbol}\n"
+                f"Цена выхода: {price}\n"
+                f"Прибыль: {trade['profit']}\n"
+                f"Время: {now}"
+            )
+            break
+
+def update_statistics(symbol, profit):
+    if symbol not in statistics:
+        statistics[symbol] = {"count": 0, "total_profit": 0.0}
+    statistics[symbol]["count"] += 1
+    statistics[symbol]["total_profit"] += profit
+
+entry_prices = {}
 trades = {}
 
 def on_message(ws, message):
@@ -15,28 +52,36 @@ def on_message(ws, message):
     try:
         data = json.loads(message)
 
-        if not isinstance(data, dict) or "data" not in data:
-            return
+        if "data" in data and isinstance(data["data"], list):
+            update = data["data"][0]
+            topic = data.get("topic", "")
+            symbol = topic.split(".")[-1] if "." in topic else "UNKNOWN"
 
-        update = data["data"]
+            if "b" in update and "a" in update and len(update["b"]) > 0 and len(update["a"]) > 0:
+                bid = float(update["b"][0][0])
+                ask = float(update["a"][0][0])
+            else:
+                raise ValueError("Нет данных bid/ask")
 
-        if not isinstance(update, dict):
-            return
-
-        if "b" in update and "a" in update and update["b"] and update["a"]:
-            bid = float(update["b"][0][0])
-            ask = float(update["a"][0][0])
             spread = ask - bid
+            spread_pct = (spread / ask) * 100
             gross_profit = spread
             net_profit = gross_profit - COMMISSION
 
-            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f}")
+            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f} ({spread_pct:.4f}%)")
             print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
+
+            now = time.strftime("%H:%M:%S")
+
+            # 💡 Условие для фиктивной сделки
+            if spread_pct > 0.02:
+                enter_trade(symbol, bid, now)
+
         else:
-            print("🔸 Пропущено сообщение без bid/ask")
+            raise ValueError("Неверный формат данных")
 
     except Exception as e:
-        print(f"❌ Ошибка обработки данных: {e}")
+        print(f"Ошибка обработки данных: {e}")
         send_telegram_message(f"❌ Ошибка обработки данных: {e}")
 
 def heartbeat():
