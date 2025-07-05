@@ -17,20 +17,31 @@ def enter_trade(symbol, price, now):
         "entry_time": now,
         "status": "open"
     }
-    trades.append(trade)
-    send_telegram_message(f"📈 Вход в сделку по {symbol}\nЦена входа: {price}\nВремя: {now}")
+
+    if symbol not in trades:
+        trades[symbol] = []  # создаём список для нового символа
+
+    trades[symbol].append(trade)
+
+    send_telegram_message(
+        f"📥 Вход в сделку по {symbol}\nЦена входа: {price}\nВремя: {now}"
+    )
 
 def exit_trade(symbol, price, now):
-    for trade in trades:
-        if trade["symbol"] == symbol and trade["status"] == "open":
+    if symbol not in trades:
+        return  # нет активных сделок для символа
+
+    for trade in trades[symbol]:
+        if trade["status"] == "open":
             trade["exit_price"] = price
             trade["exit_time"] = now
             trade["profit"] = round(price - trade["entry_price"], 6)
             trade["status"] = "closed"
 
             update_statistics(symbol, trade["profit"])
+
             send_telegram_message(
-                f"🚪 Выход из сделки по {symbol}\n"
+                f"📤 Выход из сделки по {symbol}\n"
                 f"Цена выхода: {price}\n"
                 f"Прибыль: {trade['profit']}\n"
                 f"Время: {now}"
