@@ -11,6 +11,11 @@ trades = []
 statistics = {}
 
 def enter_trade(symbol, price, now):
+
+    for trade in trades:
+    if trade["symbol"] == symbol and trade["status"] == "open":
+        return 
+        
     trade = {
         "symbol": symbol,
         "entry_price": price,
