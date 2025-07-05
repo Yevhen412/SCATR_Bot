@@ -52,38 +52,36 @@ def on_message(ws, message):
     try:
         data = json.loads(message)
 
-        if "data" in data and isinstance(data["data"], list):
-            update = data["data"][0]
-            topic = data.get("topic", "")
-            symbol = topic.split(".")[-1] if "." in topic else "UNKNOWN"
+        # Быстрая проверка на наличие orderbook обновления
+        if "topic" not in data or "data" not in data:
+            return
 
-            if "b" in update and "a" in update and len(update["b"]) > 0 and len(update["a"]) > 0:
-                bid = float(update["b"][0][0])
-                ask = float(update["a"][0][0])
-            else:
-                raise ValueError("Нет данных bid/ask")
-
-            spread = ask - bid
-            spread_pct = (spread / ask) * 100
-            gross_profit = spread
-            net_profit = gross_profit - COMMISSION
-
-            print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f} ({spread_pct:.4f}%)")
-            print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
-
-            now = time.strftime("%H:%M:%S")
-
-            # 💡 Условие для фиктивной сделки
-            if spread_pct > 0.02:
-                enter_trade(symbol, bid, now)
-
-        else:
+        update = data["data"]
+        if not isinstance(update, dict) or "b" not in update or "a" not in update:
             raise ValueError("Неверный формат данных")
+
+        topic = data.get("topic", "")
+        symbol = topic.split(".")[-1] if "." in topic else "UNKNOWN"
+
+        bid = float(update["b"][0][0])
+        ask = float(update["a"][0][0])
+        spread = ask - bid
+        spread_pct = (spread / ask) * 100
+        gross_profit = spread
+        net_profit = gross_profit - COMMISSION
+
+        print(f"BID: {bid}, ASK: {ask}, SPREAD: {spread:.4f} ({spread_pct:.4f}%)")
+        print(f"Gross: {gross_profit:.4f}, Net: {net_profit:.4f}")
+
+        now = time.strftime("%H:%M:%S")
+
+        # 💡 Условие фиктивной сделки
+        if spread_pct > 0.02:
+            enter_trade(symbol, bid, now)
 
     except Exception as e:
         print(f"Ошибка обработки данных: {e}")
         send_telegram_message(f"❌ Ошибка обработки данных: {e}")
-
 def heartbeat():
     while True:
         time.sleep(600)
