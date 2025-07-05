@@ -2,79 +2,61 @@ import time
 import threading
 import json
 import websocket
-from config import SYMBOLS, TRADE_AMOUNT_USD, COMMISSION
+
+from config import SYMBOLS, TRADE_AMOUNT_USD, COMMISSION, TAKE_PROFIT_USD, STOP_LOSS_USD, MIN_SPREAD_PCT
 from telegram_utils import send_telegram_message
 
 entry_prices = {}
-trade_times = {}
-trades = {symbol: [] for symbol in SYMBOLS}
+trades = {}
 
 def on_message(ws, message):
-    print("📥 Получено сообщение от WebSocket")
     try:
         data = json.loads(message)
+        if "topic" not in data or "data" not in data:
+            return
 
-        if "data" in data and isinstance(data["data"], list):
-            for update in data["data"]:
-                if "s" not in update or "b" not in update or "a" not in update:
-                    continue
+        topic = data["topic"]
+        symbol = topic.split(".")[-1]
+        orderbook = data["data"]
 
-                symbol = update["s"]
-                bid_list = update["b"]
-                ask_list = update["a"]
+        bid = float(orderbook["b"][0][0])
+        ask = float(orderbook["a"][0][0])
+        spread = ask - bid
 
-                if not bid_list or not ask_list:
-                    continue
+        spread_pct = spread / ask
+        net_profit_per_unit = spread - 2 * COMMISSION * ask
+        net_profit_total = net_profit_per_unit * TRADE_AMOUNT_USD
 
-                best_bid = float(bid_list[0][0])
-                best_ask = float(ask_list[0][0])
-                spread = best_bid - best_ask
-                expected_profit = spread - (best_ask * COMMISSION * 2)
-                usd_profit = expected_profit * (TRADE_AMOUNT_USD / best_ask)
+        # Условие на вход
+        if symbol not in entry_prices and spread_pct > MIN_SPREAD_PCT and net_profit_total >= TAKE_PROFIT_USD:
+            entry_prices[symbol] = ask
+            t = time.strftime('%H:%M:%S')
+            trades.setdefault(symbol, []).append((t, ask))
+            send_telegram_message(f"🟢 [{symbol}] BUY @ {ask:.4f} | Время: {t}")
 
-                print(f"{symbol} | BID: {best_bid:.4f} | ASK: {best_ask:.4f} | Net: {usd_profit:.5f}")
+        # Условие на выход
+        elif symbol in entry_prices:
+            entry = entry_prices[symbol]
+            profit = (bid - entry) * TRADE_AMOUNT_USD - 2 * COMMISSION * bid * TRADE_AMOUNT_USD
 
-                if symbol not in entry_prices and usd_profit >= 0.03:
-                    entry_prices[symbol] = best_ask
-                    trade_times[symbol] = time.strftime('%H:%M:%S')
-                    trades[symbol].append((trade_times[symbol], best_ask))
-                    send_telegram_message(f"🟢 [{symbol}] BUY @ {best_ask:.4f}")
+            if profit <= -STOP_LOSS_USD:
+                send_telegram_message(f"🛑 [{symbol}] Стоп-лосс! SELL @ {bid:.4f} | Убыток: {profit:.2f} USDT")
+                del entry_prices[symbol]
 
-                elif symbol in entry_prices:
-                    entry = entry_prices[symbol]
-                    pnl = (best_bid - entry) * (TRADE_AMOUNT_USD / entry)
-
-                    if pnl >= 0.03:
-                        send_telegram_message(f"🔴 [{symbol}] SELL @ {best_bid:.4f}\n💰 PnL: {pnl:.4f} USDT")
-                        del entry_prices[symbol]
-                        del trade_times[symbol]
-
-                    elif best_bid < entry * (1 - 0.007):  # стоп-лосс 0.7%
-                        loss = (best_bid - entry) * (TRADE_AMOUNT_USD / entry)
-                        send_telegram_message(f"🛑 [{symbol}] STOP-LOSS @ {best_bid:.4f}\n💸 Loss: {loss:.4f} USDT")
-                        del entry_prices[symbol]
-                        del trade_times[symbol]
+            elif profit >= TAKE_PROFIT_USD:
+                send_telegram_message(f"✅ [{symbol}] Тейк-профит! SELL @ {bid:.4f} | Профит: {profit:.2f} USDT")
+                del entry_prices[symbol]
 
     except Exception as e:
-        print(f"Ошибка обработки данных: {e}")
-        send_telegram_message(f"❌ Ошибка обработки данных: {e}")
+        send_telegram_message(f"❌ Ошибка обработки: {e}")
 
 def on_open(ws):
-    print("🔌 WebSocket соединение открыто")
-    args = [f"orderbook.1.{symbol}" for symbol in SYMBOLS]
-    ws.send(json.dumps({
-        "op": "subscribe",
-        "args": args
-    }))
-    send_telegram_message("🤖 Бот запущен и подписан на стаканы.")
-
-def on_error(ws, error):
-    print(f"❌ WebSocket ошибка: {error}")
-    send_telegram_message(f"❌ WebSocket ошибка: {error}")
-
-def on_close(ws):
-    print("🔌 WebSocket соединение закрыто")
-    send_telegram_message("⚠️ Соединение закрыто, попытка переподключения...")
+    for symbol in SYMBOLS:
+        ws.send(json.dumps({
+            "op": "subscribe",
+            "args": [f"orderbook.1.{symbol}"]
+        }))
+    send_telegram_message("🤖 Бот подключён к стакану и запущен.")
 
 def heartbeat():
     while True:
@@ -84,15 +66,13 @@ def heartbeat():
 def summary():
     while True:
         time.sleep(3600)
-        msg = "📊 Сводка по сделкам за час:\n"
-        for symbol, symbol_trades in trades.items():
-            if symbol_trades:
-                msg += f"\n[{symbol}]:\n"
-                for t, p in symbol_trades:
-                    msg += f"  {t}: BUY @ {p:.4f}\n"
-                trades[symbol].clear()
-        if msg.strip() != "📊 Сводка по сделкам за час:":
-            send_telegram_message(msg)
+        for symbol, history in trades.items():
+            if history:
+                msg = f"📊 [{symbol}] Сводка за час:\n"
+                for t, p in history:
+                    msg += f"{t}: BUY @ {p:.2f}\n"
+                send_telegram_message(msg)
+        trades.clear()
 
 def run_bot():
     threading.Thread(target=heartbeat, daemon=True).start()
@@ -103,16 +83,12 @@ def run_bot():
             ws = websocket.WebSocketApp(
                 "wss://stream.bybit.com/v5/public/spot",
                 on_open=on_open,
-                on_message=on_message,
-                on_error=on_error,
-                on_close=on_close
+                on_message=on_message
             )
             ws.run_forever()
         except Exception as e:
-            print(f"Ошибка подключения: {e}")
             send_telegram_message(f"❌ Ошибка подключения: {e}")
             time.sleep(10)
 
 if __name__ == "__main__":
-    print("🚀 Бот запускается...")
     run_bot()
